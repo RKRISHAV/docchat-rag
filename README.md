@@ -1,63 +1,57 @@
-# DocChat — Local Document Q&A with RAG
+# DocChat AI — Gemini RAG
 
-A runnable Streamlit app that answers questions from PDF, DOCX, and TXT documents. Uses TF-IDF retrieval and an optional local Ollama language model. No API key required.
+Streamlit app for document Q&A with Google Gemini, semantic embeddings, source citations, and evidence-only fallback.
 
-## Requirements
-- Python 3.10–3.12 recommended
-- Optional: Ollama for AI-generated answers (otherwise use Evidence-only mode)
+## Run locally (Windows CMD)
 
-## Installation
-
-```bash
-python -m venv .venv
-# Windows:
-.venv\Scripts\activate
-# macOS/Linux:
-source .venv/bin/activate
-pip install -r requirements.txt
-streamlit run app.py
+```cmd
+cd /d "C:\New Projects\docchat_rag"
+python -m pip install -r requirements.txt
+mkdir .streamlit
 ```
 
-Open the local address Streamlit prints (usually http://localhost:8501).
+Create `.streamlit/secrets.toml` containing:
 
-## Enable AI answers (optional)
+```toml
+GEMINI_API_KEY = "YOUR_KEY_HERE"
+```
 
-1. Install Ollama: https://ollama.com/download
-2. In another terminal run `ollama pull llama3.2:3b`.
-3. Start Ollama if it is not running (`ollama serve`).
-4. Choose **Local AI (Ollama)** in the app sidebar.
+Then run `python -m streamlit run app.py`.
 
-If your machine cannot run the model, select **Evidence only (no AI required)**; this retrieves and displays relevant source passages without generation.
+Get an API key at https://aistudio.google.com/apikey . API use is subject to Google's current pricing, quotas and regional availability.
 
-## How RAG works
-1. Extract text from uploaded documents (PDF pages retain page numbers).
-2. Split text into overlapping ~900-character chunks.
-3. Vectorize chunks using TF-IDF (unigrams and bigrams).
-4. Compare the question to chunks with cosine similarity.
-5. Send top chunks and the question to Ollama with a strict grounding prompt, or display chunks directly in Evidence-only mode.
-6. Show sources and similarity scores so answers can be checked.
+## Upgrade your existing Streamlit Community Cloud site
 
-## Limitations
-- Scanned/image-only PDFs need OCR; this version only reads embedded text.
-- TF-IDF is lexical retrieval, not embedding-based semantic retrieval.
-- An LLM can still make mistakes; verify the cited evidence.
-- No data is sent to cloud AI services by this app. Ollama runs locally unless you configure a remote Ollama URL.
+1. Back up the old GitHub repository if desired.
+2. Replace existing `app.py`, `requirements.txt`, `README.md`, and `sample_notes.txt` with the files from this ZIP. Add `rag.py`, `.gitignore`, `.streamlit/config.toml`, `.streamlit/secrets.toml.example`, and `tests/test_rag.py`.
+3. **Never upload `.streamlit/secrets.toml` or a real API key to GitHub.**
+4. Commit to the same GitHub repository and `main` branch. Streamlit Cloud automatically redeploys it.
+5. At https://share.streamlit.io open your app → Settings → Secrets and enter:
 
-## Project structure
-- `app.py`: Streamlit UI, extraction, chunking, retrieval, local AI generation
-- `requirements.txt`: Python dependencies
-- `tests/test_core.py`: basic automated tests
-- `sample_notes.txt`: demo document
+```toml
+GEMINI_API_KEY = "YOUR_REAL_API_KEY"
+```
 
-## Viva questions
-**What is RAG?** Retrieve relevant document passages and use them as context for an answer.
+6. Save, reboot the app if needed, upload `sample_notes.txt`, and ask "Where did the candidate work?".
 
-**Why chunk?** Small overlapping passages improve retrieval and fit the model's context window.
+## How it works
 
-**Why TF-IDF?** It is transparent, fast, and runs offline without a paid API or embedding model.
+1. PDF/DOCX/TXT text extraction; PDFs retain page numbers.
+2. Clean and split into overlapping passages.
+3. Use `gemini-embedding-001` for semantic document and query vectors. If unavailable, fall back to local TF-IDF.
+4. Rank passages by cosine similarity; take the top K.
+5. Send only the question and retrieved passages to Gemini for grounded answer generation.
+6. Display the answer and inspectable filename/page evidence.
 
-**What is cosine similarity?** A measure of directional similarity between document and question vectors.
+## Limitations and privacy
 
-**How do you reduce hallucinations?** Restrict generation to retrieved passages, request source citations, and show evidence.
+- Gemini API is a third-party service; uploaded passages and questions are sent to Google when AI is enabled, and document chunks are sent for Gemini embeddings when semantic search is enabled.
+- This public demo has no user authentication or per-user quotas. Do not expose a billable key on a public site without usage safeguards; monitor quotas and billing.
+- Sessions and indexes are held in server memory, not persistent storage. Cached indexes may remain in the app process until cleared/restarted.
+- Scanned PDFs need OCR (not included). DOCX and TXT have no reliable page metadata, so they show page 1.
+- Retrieval can miss information; citation references are to retrieved evidence, not a guarantee of factual correctness.
+- If Gemini's model identifiers or quotas change, update the model name in `app.py` and/or `rag.py`.
 
-**Why Ollama?** It serves a local language model through an HTTP API without an API key.
+## Test
+
+`python -m pytest -q`
